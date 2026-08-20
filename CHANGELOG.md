@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-20
+
+### Fixed
+
+- Peer range `>=0.0.1-rc.3` let `npm install` resolve `dsh-home-paths` to
+  `0.1.0-rc.8`, whose `dsh-invariants` peer regressed to `^0.0.1-rc.3` —
+  incompatible with `dsh-typert-protocol@0.1.0-rc.6`'s `^0.1.0-rc.6`, so a
+  fresh install failed with `ERESOLVE`. Both peers are now pinned to the
+  aligned `0.1.0-rc.6` series the dsh host ships.
+- Smoke test now hermetic for CI: fixture path derives from
+  `dshHomePath('harness')`, missing engine ESP files are bootstrapped, and
+  hardcoded demo-content assertions derive counts/ids from the snapshot.
+  Added CI (Node 18/20/22) and npm-publish-with-provenance workflows.
+
 ## [1.0.0] - 2026-08-20
 
 First stable release. Replaces the placeholder `0.0.1` registration with the
@@ -33,4 +47,5 @@ full implementation.
   request completion cannot cancel the refinement); rollback stays synchronous
   because it applies stored edits without an LLM round-trip.
 
+[1.0.1]: https://github.com/dushaobindoudou/dsh-refine/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dushaobindoudou/dsh-refine/releases/tag/v1.0.0

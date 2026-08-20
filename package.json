@@ -1,6 +1,6 @@
 {
   "name": "dsh-refine",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "UX layer for the dsh continual-harness engine (dsh-continual-harness): /refine human command + settings panel with entry browsing, refinement history timeline, one-click rollback, and auto-gate audit — engine optional at runtime.",
   "type": "module",
   "main": "./lib/index.js",
