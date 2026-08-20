@@ -2,7 +2,7 @@
 // Mounts the plugin on a real cordis root with faked host services, runs it
 // against the real demo ESP files, then asserts the `/refine` command handler
 // and both `refineUx` Remote methods behave.
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -10,11 +10,26 @@ import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const mod = await import(join(here, 'lib', 'index.js'))
 
-const HARNESS_FIXTURE = join(process.env.HOME || '/Users/liepin', '.dsh', 'harness')
+// Same resolution the plugin uses internally, so fixture reads always agree
+// with what lib/index.js sees (honours $DSH_HOME, else ~/.dsh).
+const HARNESS_FIXTURE = dshHomePath('harness')
+
+// CI bootstrap: a fresh runner has no engine ESP files. Create minimal empty
+// ones so the snapshot assertions stay deterministic (counts = 0); a local run
+// with real engine files leaves them untouched. lib/index.js already degrades
+// to undefined/[] when the files are missing - this keeps the test itself
+// hermetic without weakening the local live-fixture coverage.
+if (!existsSync(join(HARNESS_FIXTURE, 'harness_state.json'))) {
+  await mkdir(HARNESS_FIXTURE, { recursive: true })
+  await writeFile(join(HARNESS_FIXTURE, 'harness_state.json'), JSON.stringify({ version: 1, entries: {} }, null, 2))
+  await writeFile(join(HARNESS_FIXTURE, 'refinements.jsonl'), '')
+  await writeFile(join(HARNESS_FIXTURE, 'reviews.jsonl'), '')
+}
 const fsSvc = {
   resolve: async (p) => p,
   readText: async (p) => readFile(p, 'utf8'),
@@ -109,8 +124,12 @@ assert.ok(status.text.includes('引擎未挂载'), 'status mentions degraded eng
 assert.ok(status.text.includes(`memory:${expectedCounts.memory}`), 'status counts memory entries')
 
 const list = await cmd.handler({ rawInput: 'list skill' })
-assert.ok(list.text.includes('[skill] 1 条'))
-assert.ok(list.text.includes('draft-release-notes'))
+assert.ok(list.text.includes(`[skill] ${expectedCounts.skill} 条`), 'list shows the skill count from the fixture snapshot')
+const skillEntries = Object.values(stateRaw.entries?.skill ?? {})
+const firstSkillId = skillEntries.length > 0 ? (skillEntries[0].id ?? null) : null
+if (firstSkillId !== null) {
+  assert.ok(list.text.includes(firstSkillId), 'first skill entry id appears in the list')
+}
 
 const badKind = await cmd.handler({ rawInput: 'list nope' })
 assert.equal(badKind.kind, 'error')
