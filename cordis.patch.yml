@@ -1,0 +1,9 @@
+# cordis.patch.yml — dsh profile overlay mounting dsh-refine (UX layer).
+#
+# Mounts the /refine command + settings panel. The continual-harness engine
+# (dsh-continual-harness) is optional at runtime: without it every trigger
+# degrades to an actionable message; with it loaded earlier in the bundle
+# order, /refine and the panel drive the real engine.
+- insert:
+    - id: refine-ux
+      name: dsh-refine
