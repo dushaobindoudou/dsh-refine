@@ -1,99 +1,123 @@
 # dsh-refine
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![npm version](https://img.shields.io/npm/v/dsh-refine.svg?style=flat-square)](https://www.npmjs.com/package/dsh-refine)
 [![npm downloads](https://img.shields.io/npm/dm/dsh-refine.svg?style=flat-square)](https://www.npmjs.com/package/dsh-refine)
 [![License](https://img.shields.io/npm/l/dsh-refine.svg?style=flat-square)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/dushaobindoudou/dsh-refine/ci.yml?style=flat-square&label=ci)](https://github.com/dushaobindoudou/dsh-refine/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/dushaobindoudou/dsh-refine/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/dushaobindoudou/dsh-refine/actions/workflows/ci.yml)
 
-**DeepSeek Harness (dsh) 的 continual harness 精炼 UX 层**：提供 `/refine` 人类命令与
-设置面板（精炼条目浏览、历史时间线、一键回滚、auto-gate 审计）。底层驱动
-[`dsh-continual-harness`](https://github.com/jasen215/dsh-continual-harness) 引擎，
-运行时引擎**可选**——未装引擎时所有操作优雅降级为可执行指引。
+A refinement **UX layer** for the DeepSeek Harness (dsh): the `/refine` human
+command plus a settings panel with entry browsing, a refinement history
+timeline, one-click rollback, and auto-gate audit. It drives the
+[`dsh-continual-harness`](https://github.com/jasen215/dsh-continual-harness)
+engine, which is **optional at runtime** — when the engine is not mounted,
+every operation degrades into an actionable instruction instead of an error.
 
-本项目是一份对 [prime-agent](https://github.com/PrimeIntellect-ai/prime-agent)
-`/refine` 思想的移植与实践，面向 dsh 生态。
+This project is a port and practical adaptation of the
+[prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) `/refine` idea
+for the dsh ecosystem.
 
-## 特性
+## Features
 
-- **`/refine` 命令**：`status` / `list [kind]` / `history [n]` / `rollback <id>` /
-  自由文本精炼指令
-- **设置面板**：精炼 Harness 时间线、条目浏览、一键回滚、auto-gate 审计
-- **会话历史兼容**：引擎写入的 `harness/refinement` 会话事件自动注册进宿主读取器，
-  精炼过的会话日志依然可加载（不依赖数据迁移）
-- **引擎可选**：未挂载引擎时给出可操作的安装指引，不报错、不污染会话
+- **`/refine` command** — `status` / `list [kind]` / `history [n]` /
+  `rollback <id>`, plus free-text refinement instructions
+- **Settings panel** — harness timeline, entry browsing, one-click rollback,
+  auto-gate audit
+- **Session-history compatibility** — `harness/refinement` session events
+  written by the engine are registered into the host reader, so refined session
+  logs stay loadable (no data migration involved)
+- **Engine optional** — without the engine you get actionable setup guidance;
+  nothing errors out, nothing pollutes the session
 
-## 环境要求
+## Requirements
 
 - Node.js ≥ 18
-- dsh 0.1.0-rc.6+（含 `@deepseek-ai/dsh-home-paths`、`@deepseek-ai/dsh-typert-protocol`）
+- dsh 0.1.0-rc.6+ (with `@deepseek-ai/dsh-home-paths` and
+  `@deepseek-ai/dsh-typert-protocol`)
 
-## 安装
+## Installation
 
-在 dsh profile（如 `~/.dsh/profiles/web/cordis.yml`）中挂载本包与引擎：
+Mount this package and the engine in your dsh profile (e.g.
+`~/.dsh/profiles/web/cordis.yml`):
 
 ```yaml
 plugins:
-  - dsh-continual-harness   # 引擎（可选，但装了才能真触发精炼）
-  - dsh-refine              # 本 UX 层（必须）
+  - dsh-continual-harness   # the engine (optional, but required to actually trigger refinements)
+  - dsh-refine              # this UX layer (required)
 ```
 
-或直接用 `link:` 指向本地 checkout 进行开发：
+Or point at a local checkout with `link:` during development:
 
 ```yaml
 plugins:
   - link:/path/to/dsh-refine
 ```
 
-重启 `dsh web` 后生效（宿主侧改动需要重启，客户端面板改动可在 `pnpm run dev:web`
-运行时热更）。
+Restart `dsh web` to apply (host-side changes need a restart; client panel
+changes hot-reload while `pnpm run dev:web` is running).
 
-## 用法
+## Usage
 
-### 命令
+### Command
 
-| 输入 | 说明 |
-| --- | --- |
-| `/refine status` | 引擎/回滚状态总览 |
-| `/refine list [kind]` | 列出当前条目（可过滤 `prompt/memory/skill/subagent`） |
-| `/refine history [n]` | 最近精炼历史（默认 10 条，上限 50） |
-| `/refine rollback <id>` | 回滚一次已提交的精炼（id 见 `history`） |
-| `/refine <任意指令>` | 触发一次引擎精炼，立即返回；结果稍后在面板/`history` 中呈现 |
+| Input | Description |
+| ----- | ----------- |
+| `/refine status` | Overview of engine/rollback state |
+| `/refine list [kind]` | List current entries (filter by `prompt`/`memory`/`skill`/`subagent`) |
+| `/refine history [n]` | Recent refinement history (default 10, max 50) |
+| `/refine rollback <id>` | Roll back one committed refinement (ids from `history`) |
+| `/refine <any text>` | Trigger an engine refinement; returns immediately, results appear later in the panel / `history` |
 
-> `/refine <文字>` 的语义是把文字当作**精炼指令**交给引擎规划。普通聊天请求请直接在
-> 输入框发送，不要带 `/` 前缀。
+> `/refine <text>` treats the text as a **refinement instruction** handed to
+> the engine's planner. For ordinary chat, just type in the input box without
+> the `/` prefix.
 
-### 面板
+### Panel
 
-设置 → **精炼 Harness**：浏览条目、查看历史时间线、一键回滚、auto-gate 审计。
+Settings → **Refine Harness**: browse entries, inspect the history timeline,
+roll back with one click, and audit auto-gate decisions.
 
-## 工作原理
+## How it works
 
 ```
-/refine 命令 ──► dsh-commands ──► dsh-refine (lib/index.js)
-                     │                     │
-                     │              tools.execute('harness_refine', {signal})
-                     ▼                     ▼
-              command/run+done      dsh-continual-harness 引擎
-                     │                     │
-                     └── harness/refinement 会话事件
+/refine command ──► dsh-commands ──► dsh-refine (lib/index.js)
+                      │                     │
+                      │              tools.execute('harness_refine', {signal})
+                      ▼                     ▼
+               command/run+done      dsh-continual-harness engine
+                      │                     │
+                      └── harness/refinement session events
 ```
 
-- 指令触发为**后台 fire-and-forget**：同步校验引擎/agent，随即 ack，避免长时间锁住
-  输入框；引擎结果落在面板历史时间线与 `/refine history`。
-- 回滚为同步：只应用已存的逆编辑，无 LLM 往返。
-- 会话事件兼容：`lib/compat.js` 把 `harness/refinement` 注册进宿主读取器的已知事件
-  集合（`KNOWN_SESSION_EVENT_TYPES`），一处注册同时治愈旧日志与未来写入。
+- Instruction triggers are **background fire-and-forget**: the engine and agent
+  are validated synchronously, then the command acks immediately so the input
+  box is never frozen for a planner round-trip; engine results land in the
+  panel timeline and `/refine history`.
+- Rollback is synchronous: it applies the stored inverse edits only, with no
+  LLM round-trip.
+- Session-event compatibility: `lib/compat.js` registers `harness/refinement`
+  into the host reader's known event-type set (`KNOWN_SESSION_EVENT_TYPES`) —
+  one registration heals both old logs and future writes.
 
-## 开发
+## Development
 
 ```bash
 npm install
-npm test        # 冒烟测试（不依赖引擎；dsh 在 PATH 上时额外验证宿主注册）
+npm run lint    # ESLint (lib/ + smoke-host.mjs)
+npm test        # smoke suite — no engine required; extra host-registration
+                # assertions run when dsh is on PATH
 ```
 
-冒烟测试是封闭式的：`~/.dsh/harness` 缺少引擎 ESP 文件时自动生成最小 fixture。用 `DSH_HOME=/tmp/fresh npm test` 可以在干净目录下复现 CI 环境。
+The smoke suite is hermetic: minimal engine ESP fixtures are bootstrapped
+automatically when `~/.dsh/harness` lacks them, and it also exercises the real
+dsh install paths for compatibility regression (skipped gracefully when `dsh`
+is not on `PATH`). Run `DSH_HOME=/tmp/fresh npm test` to reproduce the CI
+environment in a clean directory.
 
-冒烟测试使用真实 dsh 安装路径做兼容性回归（找不到 `dsh` 时优雅跳过相关断言）。
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit style, changelog policy, and
+the release process; see [SECURITY.md](SECURITY.md) for reporting
+vulnerabilities.
 
 ## License
 

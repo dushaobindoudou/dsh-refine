@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-08-21
+
+### Added
+
+- Community health files: `CONTRIBUTING.md` (dev setup, commit style, release
+  process), `SECURITY.md` (private vulnerability reporting policy), bug/feature
+  issue templates, PR template, `CODEOWNERS`, and `.editorconfig`.
+- Bilingual docs: English `README.md` (primary) plus `README.zh-CN.md`,
+  cross-linked; both shipped in the npm tarball.
+- ESLint 10 flat config (`eslint.config.js`) with `lint` / `lint:fix` scripts;
+  `prepublishOnly` now lints before testing. Dev-only tooling — the package
+  still ships zero runtime dependencies.
+
+### Changed
+
+- CI: dedicated `lint` job; all workflows install with `npm ci` (lockfile is
+  now committed for reproducible installs).
+- Publish workflow additionally creates the GitHub Release with the changelog
+  notes for the tagged version.
+
+### Fixed
+
+- Minor lint findings with no behavior change: unused `fileURLToPath` import
+  in `lib/compat.js`, a dead `engineActive` initialization, and an unused
+  parameter name in `RefineUxRemote.data`.
+
 ## [1.0.1] - 2026-08-20
 
 ### Fixed
@@ -47,5 +73,6 @@ full implementation.
   request completion cannot cancel the refinement); rollback stays synchronous
   because it applies stored edits without an LLM round-trip.
 
+[1.0.2]: https://github.com/dushaobindoudou/dsh-refine/releases/tag/v1.0.2
 [1.0.1]: https://github.com/dushaobindoudou/dsh-refine/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dushaobindoudou/dsh-refine/releases/tag/v1.0.0

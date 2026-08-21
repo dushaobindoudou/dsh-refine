@@ -4,8 +4,8 @@ node_modules/
 # npm local cache used when the global cache is outside the sandbox
 .npm-cache/
 
-# Lockfile for a zero-runtime-dep library (peer deps only); not committed
-package-lock.json
+# Lockfile is committed: CI and publish workflows run `npm ci` for
+# reproducible installs (dev tooling only — runtime stays dependency-free).
 
 # Vendored third-party reference material (engine source/tests), kept local
 refs/
