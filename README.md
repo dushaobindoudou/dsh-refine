@@ -91,6 +91,8 @@ npm install
 npm test        # 冒烟测试（不依赖引擎；dsh 在 PATH 上时额外验证宿主注册）
 ```
 
+冒烟测试是封闭式的：`~/.dsh/harness` 缺少引擎 ESP 文件时自动生成最小 fixture。用 `DSH_HOME=/tmp/fresh npm test` 可以在干净目录下复现 CI 环境。
+
 冒烟测试使用真实 dsh 安装路径做兼容性回归（找不到 `dsh` 时优雅跳过相关断言）。
 
 ## License
