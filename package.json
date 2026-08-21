@@ -1,6 +1,6 @@
 {
   "name": "dsh-refine",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "DeepSeek Harness (dsh) plugin: /refine command + settings panel for the dsh-continual-harness self-refinement engine — entry browsing, refinement history timeline, one-click rollback, auto-gate audit; engine optional at runtime.",
   "type": "module",
   "main": "./lib/index.js",
