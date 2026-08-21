@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- npm search metadata: description now leads with "DeepSeek Harness (dsh)
+  plugin" and keywords align with the ecosystem (`dsh-plugin`, `plugin`,
+  `cordis`, `cordis-plugin`, `refinement`, …); repository description,
+  homepage, and topics configured via `gh api`.
 - CI: dedicated `lint` job; all workflows install with `npm ci` (lockfile is
   now committed for reproducible installs).
 - Publish workflow additionally creates the GitHub Release with the changelog
