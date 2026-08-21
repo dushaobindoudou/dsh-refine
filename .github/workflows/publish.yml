@@ -44,8 +44,10 @@ jobs:
       - name: Extract release notes from CHANGELOG.md
         run: |
           TAG="${GITHUB_REF_NAME#v}"
+          # Literal substring match — index(), not a regex: version brackets
+          # like "## [1.0.2]" would otherwise parse as a character class.
           awk -v ver="## [$TAG]" '
-            $0 ~ "^" ver { found = 1; next }
+            index($0, ver) == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > release-notes.md
