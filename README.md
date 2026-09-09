@@ -14,6 +14,16 @@ timeline, one-click rollback, and auto-gate audit. It drives the
 engine, which is **optional at runtime** — when the engine is not mounted,
 every operation degrades into an actionable instruction instead of an error.
 
+The plugin is the **shell**, and since 1.2.0 it mounts the engine itself:
+`dsh-continual-harness` starts as a child plugin under `ctx.isolate('commands')`,
+so the engine's own `/refine` adapter never registers and dsh-refine keeps the
+full command surface (`status` / `list` / `history` / `rollback` / triggers)
+while forwarding the engine's `--global` / `--local` grammar to it. List only
+`dsh-refine` in your profile's `dsh.profile.bundles`; a profile that still
+mounts `dsh-continual-harness` as its own row keeps working — the shell detects
+the already-registered engine, skips its own mount, and falls back to the
+engine's `/refine`.
+
 This project is a port and practical adaptation of the
 [prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) `/refine` idea
 for the dsh ecosystem.
@@ -21,19 +31,28 @@ for the dsh ecosystem.
 ## Features
 
 - **`/refine` command** — `status` / `list [kind]` / `history [n]` /
-  `rollback <id>`, plus free-text refinement instructions
+  `rollback <id>`, plus free-text refinement instructions (owned by the engine
+  when it is mounted; provided by dsh-refine otherwise)
 - **Settings panel** — harness timeline, entry browsing, one-click rollback,
   auto-gate audit
-- **Session-history compatibility** — `harness/refinement` session events
-  written by the engine are registered into the host reader, so refined session
-  logs stay loadable (no data migration involved)
+- **Bilingual & themed** — the panel reads the host locale (Simplified Chinese
+  / English) and adapts to the dark and light themes through dsh design tokens
+  with no hardcoded colors
+- **Session-history compatibility** — the `harness/refinement` session event
+  written by older engine builds is registered into the host reader so legacy
+  refined-session logs stay loadable (the 0.3.0 engine self-registers and no
+  longer writes it; dsh-refine keeps an idempotent defensive registration)
+- **Host gap bridging** — where the installed engine's turn-time code reads
+  `session.events` but the dsh host only exposes `snapshotEvents()`, dsh-refine
+  installs a guarded `events` getter so the engine's projection/planner stops
+  crashing with `Cannot read properties of undefined (reading 'length')`
 - **Engine optional** — without the engine you get actionable setup guidance;
   nothing errors out, nothing pollutes the session
 
 ## Requirements
 
 - Node.js ≥ 18
-- dsh 0.1.0-rc.6+ (with `@deepseek-ai/dsh-home-paths` and
+- dsh 0.1.2-rc.1+ (aligned `@deepseek-ai/dsh-home-paths` and
   `@deepseek-ai/dsh-typert-protocol`)
 
 ## Installation
@@ -71,23 +90,26 @@ changes hot-reload while `pnpm run dev:web` is running).
 
 > `/refine <text>` treats the text as a **refinement instruction** handed to
 > the engine's planner. For ordinary chat, just type in the input box without
-> the `/` prefix.
+> the `/` prefix. When `dsh-continual-harness@0.3.0+` is mounted it owns
+> `/refine` (plan + rollback); the panel below still offers the browse /
+> timeline / one-click-rollback views.
 
 ### Panel
 
-Settings → **Refine Harness**: browse entries, inspect the history timeline,
-roll back with one click, and audit auto-gate decisions.
+Settings → **Refine Harness**: a settings-style overview of engine and state
+path, browse `prompt` / `memory` / `skill` / `subagent` entries, inspect the
+history timeline and roll back with one click, and audit auto-gate decisions.
 
 ## How it works
 
 ```
-/refine command ──► dsh-commands ──► dsh-refine (lib/index.js)
-                      │                     │
-                      │              tools.execute('harness_refine', {signal})
-                      ▼                     ▼
-               command/run+done      dsh-continual-harness engine
-                      │                     │
-                      └── harness/refinement session events
+engine mounted (dsh-continual-harness@0.3.0+):
+  /refine  ──► engine's own /refine ──► coordinator ──► harness_state.json / refinements.jsonl
+
+engine absent:
+  /refine  ──► dsh-refine /refine ──► tools.execute('harness_refine') ──► actionable setup instruction
+
+panel (always): 设置 → 精炼 Harness ──► refineUx data/rollback ──► ESP files + harness_refine
 ```
 
 - Instruction triggers are **background fire-and-forget**: the engine and agent
@@ -98,7 +120,8 @@ roll back with one click, and audit auto-gate decisions.
   LLM round-trip.
 - Session-event compatibility: `lib/compat.js` registers `harness/refinement`
   into the host reader's known event-type set (`KNOWN_SESSION_EVENT_TYPES`) —
-  one registration heals both old logs and future writes.
+  one registration keeps logs from older engine builds loadable; as of 0.3.0
+  the engine no longer writes the event and self-registers the type itself.
 
 ## Development
 

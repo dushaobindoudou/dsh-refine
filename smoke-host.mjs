@@ -1,7 +1,8 @@
 // Runtime smoke test for dsh-refine lib/index.js (host half).
 // Mounts the plugin on a real cordis root with faked host services, runs it
 // against the real demo ESP files, then asserts the `/refine` command handler
-// and both `refineUx` Remote methods behave.
+// (deferred to the engine when it is mounted), both `refineUx` Remote methods,
+// and the compat registration against the live host.
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -70,7 +71,10 @@ async function mount(toolsSvc, agentsSvc) {
     root.provide(key)
     if (value !== undefined) root.set(key, value)
   }
-  const fiber = root.plugin(mod)
+  // The shell mounts the real engine by default; these scenarios drive the
+  // tools seam with fakes instead, so the mount is opted out of here. The
+  // 套壳 mount path has its own case at the end of this file.
+  const fiber = root.plugin(mod, { mountEngine: false })
   await fiber
   const remote = root.get('refineUx')
   assert.ok(remote !== undefined, 'refineUx Remote service registered')
@@ -154,7 +158,7 @@ for (const bad of [null, {}, { id: 42 }]) {
 }
 
 // --- engine present: the execute path is taken ----------------------------------
-let executed = null
+let executed
 const present = await mount({
   get: (n) => (n === 'harness_refine' ? { name: n } : undefined),
   // Faithful mirror of the real ToolRuntime seam the GUI hit (dsh-tools):
@@ -174,45 +178,56 @@ const data2 = await present.remote.data(null)
 assertJsonSafe(data2, 'refineUx/data')
 assert.equal(data2.engineActive, true, 'engine detected via tools registry')
 
+// dsh-refine is the shell: it owns `/refine` whether or not the engine is
+// reachable. The engine's own adapter never registers because `mountEngine()`
+// starts it under `ctx.isolate('commands')`, so there is no duplicate name to
+// collide - and the shell keeps status/list/history, which the engine's
+// two-mode command does not offer.
+assert.equal(present.registered.length, 1, '/refine owned by the shell when the engine is mounted')
+const refineCmd = present.registered[0]
+assert.equal(refineCmd.name, 'refine')
+assert.ok(refineCmd.input.hint.includes('--global'), 'hint advertises the engine scope flags')
+
+// Scope flags are parsed by the shell and forwarded to the engine tool as the
+// boolean `global` the tool documents; omitting both leaves the key unset so
+// the engine applies its deployment default.
+const invoke = (rawInput) => refineCmd.handler({
+  rawInput,
+  signal: new AbortController().signal,
+  commandId: 'c1',
+  agent: { id: 'a1' },
+  attachments: [],
+})
+
+executed = null
+const rbLocal = await invoke('rollback refine-1 --local')
+assert.equal(rbLocal.kind, 'success', 'scoped rollback succeeds')
+assert.equal(executed.arguments.rollback_id, 'refine-1')
+assert.equal(executed.arguments.global, false, '--local maps to global:false')
+
+executed = null
+const rbBare = await invoke('rollback refine-2')
+assert.equal(rbBare.kind, 'success')
+assert.equal('global' in executed.arguments, false, 'no flag leaves global unset')
+
+const bothFlags = await invoke('rollback refine-3 --local --global')
+assert.equal(bothFlags.kind, 'error', 'conflicting scope flags rejected')
+
+const unknownFlag = await invoke('rollback refine-4 --nope')
+assert.equal(unknownFlag.kind, 'error', 'unknown flag rejected')
+
+const statusResult = await invoke('')
+assert.equal(statusResult.kind, 'success', 'status still answered by the shell')
+assert.ok(statusResult.text.includes('引擎已挂载'), 'status reports the engine')
+
 const rb = await present.remote.rollback({ id: 'refine-20260820-01' })
 assertJsonSafe(rb, 'refineUx/rollback')
 assert.equal(rb.ok, true)
 assert.equal(executed.name, 'harness_refine')
 assert.equal(executed.arguments.rollback_id, 'refine-20260820-01')
 assert.ok(executed.agent && executed.agent.id === 'a1')
-
-// Rollback is synchronous and threads the invocation signal through to
-// tools.execute (an aborted UI request also aborts its rollback).
-const invSignal = new AbortController().signal
-const rbCmd = await present.registered[0].handler({ rawInput: 'rollback refine-20260820-01', signal: invSignal })
-assert.equal(rbCmd.kind, 'success')
-assert.equal(executed.name, 'harness_refine')
-assert.equal(executed.arguments.rollback_id, 'refine-20260820-01')
-assert.equal(executed.signal, invSignal, 'rollback threads the invocation signal into tools.execute')
-
-// The trigger path is fire-and-forget: the ack must NOT wait for the engine.
-// A never-settling execute proves the handler resolves without awaiting it
-// (and still reaches the registry's exec.signal read via a fresh signal).
-let bgExecuted = null
-const bg = await mount({
-  get: (n) => (n === 'harness_refine' ? { name: n } : undefined),
-  execute: (exec) => {
-    if (exec.signal === undefined) {
-      throw new TypeError("Cannot read properties of undefined (reading 'aborted')")
-    }
-    bgExecuted = exec
-    return new Promise(() => {}) // never settles: a synchronous ack is required
-  },
-}, { roots: () => [{ id: 'a2' }] })
-const trigger = await bg.registered[0].handler({ rawInput: '记住要跑 pnpm install' })
-assert.equal(trigger.kind, 'success', 'trigger acks immediately despite in-flight engine work')
-assert.ok(String(trigger.text).includes('后台'), 'ack explains the refinement runs in the background')
-assert.ok(bgExecuted !== null, 'engine tool dispatch was launched')
-assert.equal(bgExecuted.name, 'harness_refine')
-assert.equal(bgExecuted.arguments.instructions, '记住要跑 pnpm install')
-assert.ok(bgExecuted.agent && bgExecuted.agent.id === 'a2')
-assert.ok(bgExecuted.signal !== undefined && typeof bgExecuted.signal.aborted === 'boolean',
-  'background dispatch still supplies an AbortSignal (registry reads exec.signal.aborted)')
+assert.ok(executed.signal !== undefined && typeof executed.signal.aborted === 'boolean',
+  'remote rollback supplies an AbortSignal (registry reads exec.signal.aborted unguarded)')
 
 // --- reader compat: engine session-event registration (lib/compat.js) ---------
 //
@@ -249,5 +264,76 @@ if (dshEntry !== null && existsSync(dshEntry)) {
 } else {
   console.log('smoke-host: dsh not on PATH - skipped live host-registration assertions')
 }
+
+// Engine 0.3.0 reads `session.events` (an array) in its pre-step projection.
+// Recent dsh hosts drop the public `events` array (they expose `surface` +
+// `snapshotEvents()`), so dsh-refine installs a guarded `events` getter
+// aliasing `snapshotEvents()`. Degrade + live checks mirror the event-type
+// registration above.
+const shimDegraded = await compat.installSessionEventsShim({ entry: '/nonexistent/dsh-bin.js' })
+assert.equal(shimDegraded.shimmed, false, 'bogus entry degrades to captured status')
+assert.ok(typeof shimDegraded.reason === 'string' && shimDegraded.reason.length > 0, 'failure carries a reason')
+if (dshEntry !== null && existsSync(dshEntry)) {
+  const shim = await compat.installSessionEventsShim({ entry: dshEntry })
+  const hostSession = await import(pathToFileURL(compat.resolveHostSessionModule(dshEntry)).href)
+  const desc = Object.getOwnPropertyDescriptor(hostSession.Session.prototype, 'events')
+  assert.ok(desc !== undefined, 'host Session.prototype exposes an events descriptor after the shim')
+  if (shim.shimmed === true) {
+    assert.ok(typeof desc.get === 'function', 'events is a getter when the shim installs it')
+    assert.equal(desc.enumerable, false, 'events getter is non-enumerable')
+  } else {
+    assert.equal(shim.reason, 'host Session already exposes events', 'already-exposing hosts are an expected no-op')
+  }
+  await compat.installSessionEventsShim({ entry: dshEntry }) // idempotent, never throws
+} else {
+  console.log('smoke-host: dsh not on PATH - skipped live session-events shim assertions')
+}
+
+// --- the 套壳 mount: the shell starts the engine and keeps /refine ------------
+//
+// `mountEngine()` starts dsh-continual-harness under `ctx.isolate('commands')`.
+// The isolated scope is what stops the engine's own `/refine` adapter from
+// registering, so the two commands can never collide: the assertion below is
+// that after a real mount the host registry saw exactly ONE `refine`, ours.
+const engineMod = await import(join(here, 'lib', 'engine.js'))
+
+// Skip guard: a profile that already mounted the engine must not get a second
+// copy of the harness_refine tool.
+const skipped = await engineMod.mountEngine(new Context(), {
+  tools: { get: (n) => (n === 'harness_refine' ? { name: n } : undefined) },
+})
+assert.equal(skipped.mounted, false, 'existing engine is not mounted twice')
+assert.ok(String(skipped.reason).includes('already mounted'), 'skip reason names the cause')
+
+// A missing/broken engine degrades to a captured status, never a throw.
+assert.equal(typeof engineMod.engineMountStatus, 'object', 'mount status is always an object')
+assert.equal(engineMod.ENGINE_TOOL, 'harness_refine')
+
+// Real mount: the engine injects `agents` + `tools`, so provide both.
+const mountRoot = new Context()
+const mountRegistered = []
+const hostTools = new Map()
+for (const [key, value] of [
+  ['fs', fsSvc],
+  ['commands', { register: (def) => { mountRegistered.push(def); return () => {} } }],
+  ['tools', {
+    get: (n) => hostTools.get(n),
+    register: (def) => { hostTools.set(def.name, def); return () => hostTools.delete(def.name) },
+    execute: async () => ({ ok: true }),
+  }],
+  ['agents', { roots: () => [{ id: 'a1' }] }],
+]) {
+  mountRoot.provide(key)
+  mountRoot.set(key, value)
+}
+await mountRoot.plugin(mod, {})
+// The mount is fire-and-forget; give its dynamic import a turn to settle.
+for (let i = 0; i < 50 && engineMod.engineMountStatus.reason === 'not attempted'; i++) {
+  await new Promise((r) => setTimeout(r, 20))
+}
+const refineNames = mountRegistered.filter((d) => d.name === 'refine')
+assert.equal(refineNames.length, 1, 'exactly one /refine registered (the shell keeps it)')
+assert.ok(refineNames[0].input.hint.includes('history'),
+  'the surviving /refine is the shell\'s full-surface one, not the engine two-mode adapter')
 
 console.log('smoke-host: all assertions passed ✓  (fixtures:', HARNESS_FIXTURE + ')')

@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-09
+
+### Added
+
+- **dsh-refine now mounts the engine itself** — the shell owns the whole
+  arrangement instead of sitting beside it. `lib/engine.js` starts
+  `dsh-continual-harness` as a child plugin under `ctx.isolate('commands')`:
+  below an isolated context the `commands` service resolves in a fresh scope
+  nothing provides, so the engine's own `/refine` adapter never registers
+  (its documented "commands capability not available" degraded path), while
+  `agents`, `tools`, `fs` and the session log stay shared — its
+  `harness_refine` tool lands in the same registry this package dispatches
+  through. `dsh-continual-harness` is therefore a real dependency (`^0.3.0`)
+  rather than something the profile mounts separately.
+- `/refine` accepts the engine's scope grammar: `--global` / `--local` on both
+  triggers and rollback, forwarded to `harness_refine` as the boolean `global`
+  it documents. Passing neither leaves the key unset so the engine applies its
+  deployment default; conflicting or unknown flags are rejected up front.
+- `mountEngine` row config (default `true`) opts out of the built-in mount, for
+  a legacy profile that still lists `dsh-continual-harness` as its own bundle
+  row or to run this package as a read-only panel. Engine row config passes
+  through unchanged as `engine`.
+- `./engine` subpath export, and `engineOwned` in the `refineUx/data` payload
+  so the panel can tell a shell-hosted engine from a separately mounted one.
+
+### Changed
+
+- **Reverted 1.1.0's deferral: the shell owns `/refine` again.** Deferring
+  handed the command to the engine's two-mode adapter (plan + rollback) and
+  silently dropped `status`, `list` and `history` — the browse and timeline
+  surface that is this package's reason to exist. Isolating `commands` for the
+  engine removes the name collision at its source, so no one has to give the
+  command up. The `try/catch` around registration stays as a safety net for a
+  legacy profile that still mounts the engine as its own row.
+
+### Migration
+
+Remove `dsh-continual-harness` from the profile's `dsh.profile.bundles`; keep
+`dsh-refine` there and it starts the engine for you. A profile that keeps both
+rows still works — the shell detects the already-registered `harness_refine`
+tool, skips its own mount, and falls back to the engine's `/refine`.
+
+## [1.1.0] - 2026-09-09
+
+### Changed
+
+- Upgrade to the aligned `0.1.2-rc.1` peer series (`@deepseek-ai/dsh-home-paths`,
+  `@deepseek-ai/dsh-typert-protocol`) so the plugin resolves against the current
+  dsh host and the `refineUx` panel talks the exact Typert protocol the host
+  ships. Transitive `@deepseek-ai/cordis` peer now resolves to `^4.0.2`.
+- Client settings panel redesigned as a native settings section: renamed to
+  **Refine Harness / 精炼 Harness**, localized the full UI via the host `locale`
+  model (Simplified Chinese + English dictionaries, auto-switching), themed
+  solely with `--dsw-alias-*` design tokens (dark/light adapts automatically),
+  and restructured into an Overview card (engine / state path / entry counts /
+  plugin version) plus Entries, History, and Auto-gate sections consistent with
+  dsh's native settings interactions.
+- Defer `/refine` to the engine when it is mounted: `dsh-continual-harness@0.3.0`
+  registers the same command itself, and the host commands registry rejects the
+  duplicate ("command \"refine\" is already registered") and would break plugin
+  startup depending on load order. dsh-refine now detects the engine's
+  `harness_refine` tool at effect-run time and skips its own `/refine`
+  registration, keeping the settings panel (browse / timeline / rollback /
+  audit) as the wrapper's value-add. Without an engine the `/refine` command
+  still ships (degraded status/list/history/rollback/trigger views).
+
+### Fixed
+
+- Redundant-but-defensive: `lib/compat.js` stays compatible across engine
+  versions. The 0.3.0 engine no longer writes `harness/refinement` and
+  self-registers the legacy event type; dsh-refine keeps registering it so
+  logs from older 0.1.x engine builds remain readable.
+- Bridge a host/engine API gap so turns stop crashing: engine 0.3.0 reads
+  `session.events` in its `agent/pre-step` projection, but current dsh hosts
+  expose only `surface` + `snapshotEvents()` (no public `events` array), which
+  surfaced as `Cannot read properties of undefined (reading 'length')` on every
+  turn (including ACP). dsh-refine now installs a guarded, non-enumerable,
+  idempotent `events` getter on the host `Session.prototype` aliasing
+  `snapshotEvents()` (`installSessionEventsShim` in `lib/compat.js`), so the
+  engine's projection/planner reads work on the `0.1.2-rc.1` host series.
+
+---
 ## [1.0.3] - 2026-08-21
 
 ### Changed
