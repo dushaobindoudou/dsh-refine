@@ -85,7 +85,7 @@
     "eslint": "^10.8.1"
   },
   "dependencies": {
-    "dsh-continual-harness": "^0.3.0"
+    "dsh-continual-harness": "^0.3.1"
   },
   "overrides": {
     "@deepseek-ai/dsh-agent": "0.1.2-rc.1",

@@ -112,7 +112,12 @@ for (const k of ['prompt', 'memory', 'skill', 'subagent']) {
   assert.equal(data.entries[k].length, expectedCounts[k], `${k} count matches fixture snapshot`)
 }
 assert.equal(data.history.length, expectedHistory, 'history matches fixture snapshot (capped at 20)')
-const rollbackRecords = historyAll.filter((r) => typeof r.rollbackOf === 'string')
+// The panel surfaces the newest 20 records; the rollback assertion must use the
+// same window. The only rollback in the live store is ancient fixture data -
+// once it slides out of the 20-cap (shared live store keeps growing) the
+// assertion must skip, not fail. CI's fresh empty fixtures skip it too.
+const historyWindow = historyAll.slice(-20)
+const rollbackRecords = historyWindow.filter((r) => typeof r.rollbackOf === 'string')
 if (rollbackRecords.length > 0) {
   assert.ok(data.history.some((h) => h.rollbackOf), 'rollback records surfaced')
 }
