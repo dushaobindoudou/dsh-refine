@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-09-18
+
+dsh 0.1.5-rc.2 compatibility release.
+
+### Fixed
+
+- **Theme token (P2)**: the panel referenced `--dsw-alias-fill-tsp-secondary`,
+  which does not exist in any shipped dsh frontend CSS (verified against both
+  0.1.2-rc.1 and 0.1.5-rc.2) — non-tinted badges and the disabled rollback
+  button rendered with a transparent background. Now uses the real
+  `--dsw-alias-bg-layer-2` with a `transparent` fallback.
+- **README (P2)**: the installation section no longer teaches the dead
+  `cordis.yml plugins:` key or a separate engine bundle row; it documents the
+  `dsh plugin add` / bundles flow and the 1.2.0 shell-mounts-the-engine
+  design. Version support statement updated to dsh 0.1.5-rc.2.
+
+### Changed
+
+- Peer deps `@deepseek-ai/dsh-home-paths` / `@deepseek-ai/dsh-typert-protocol`
+  moved to `^0.1.5-rc.2` (the dsh core convention; the exact `0.1.2-rc.1` pins
+  could never resolve to 0.1.5-rc.x under npm prerelease semantics). Keep
+  typert single-instance with the host via the profile's `pnpm.overrides`.
+
 ## [Unreleased]
 
 ## [1.2.0] - 2026-09-09

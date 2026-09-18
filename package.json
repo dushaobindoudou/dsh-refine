@@ -1,6 +1,6 @@
 {
   "name": "dsh-refine",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "DeepSeek Harness (dsh) plugin: a shell around the dsh-continual-harness self-refinement engine — mounts the engine itself and owns /refine (status / entry browsing / refinement history / one-click rollback / scoped triggers) plus a settings panel; engine still optional at runtime.",
   "type": "module",
   "main": "./lib/index.js",
@@ -66,8 +66,8 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-home-paths": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.2-rc.1"
+    "@deepseek-ai/dsh-home-paths": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.2"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-home-paths": {

@@ -39,24 +39,29 @@ dsh-refine 仍自带 `/refine`（降级视图）。
 ## 环境要求
 
 - Node.js ≥ 18
-- dsh 0.1.2-rc.1+（对齐的 `@deepseek-ai/dsh-home-paths`、`@deepseek-ai/dsh-typert-protocol`）
+- dsh 0.1.5-rc.2（已对其验证；`@deepseek-ai/dsh-home-paths` /
+  `@deepseek-ai/dsh-typert-protocol` 的 peer 依赖沿用 dsh 本体惯例
+  `^0.1.5-rc.2`，且必须与宿主保持单实例——用 profile 的 `pnpm.overrides` 对齐）
 
 ## 安装
 
-在 dsh profile（如 `~/.dsh/profiles/web/cordis.yml`）中挂载本包与引擎：
+把本包加入 profile 即可，引擎由它自己挂载（1.2.0 起"壳"负责整体编排——
+**不要**再把 `dsh-continual-harness` 单独列为一个 bundle 行）：
 
-```yaml
-plugins:
-  - dsh-continual-harness   # 引擎（可选，但装了才能真触发精炼）
-  - dsh-refine              # 本 UX 层（必须）
+```bash
+dsh plugin --profile web add dsh-refine
 ```
 
-或直接用 `link:` 指向本地 checkout 进行开发：
+开发时把 profile `package.json` 的依赖指向本地 checkout 再重装：
 
-```yaml
-plugins:
-  - link:/path/to/dsh-refine
+```bash
+cd ~/.dsh/profiles/web
+pnpm add link:/path/to/dsh-refine
+dsh plugin --profile web install
 ```
+
+引擎作为 dsh-refine 自身的依赖（`dsh-continual-harness` `^0.3.1`）在隔离的
+`commands` scope 下挂载，它的 `/refine` 适配器不会与本包冲突。
 
 重启 `dsh web` 后生效（宿主侧改动需要重启，客户端面板改动可在 `pnpm run dev:web`
 运行时热更）。

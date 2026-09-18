@@ -52,26 +52,33 @@ for the dsh ecosystem.
 ## Requirements
 
 - Node.js ≥ 18
-- dsh 0.1.2-rc.1+ (aligned `@deepseek-ai/dsh-home-paths` and
-  `@deepseek-ai/dsh-typert-protocol`)
+- dsh 0.1.5-rc.2 (verified against it; peer deps follow the dsh core
+  convention `^0.1.5-rc.2` for `@deepseek-ai/dsh-home-paths` /
+  `@deepseek-ai/dsh-typert-protocol`, which must stay single-instance with the
+  host — align them via the profile's `pnpm.overrides`)
 
 ## Installation
 
-Mount this package and the engine in your dsh profile (e.g.
-`~/.dsh/profiles/web/cordis.yml`):
+Add the package to your profile and let it mount the engine itself (since
+1.2.0 the shell owns the whole arrangement — do **not** mount
+`dsh-continual-harness` as a separate bundle row):
 
-```yaml
-plugins:
-  - dsh-continual-harness   # the engine (optional, but required to actually trigger refinements)
-  - dsh-refine              # this UX layer (required)
+```bash
+dsh plugin --profile web add dsh-refine
 ```
 
-Or point at a local checkout with `link:` during development:
+For development, point the profile's `package.json` dependency at a local
+checkout and reinstall:
 
-```yaml
-plugins:
-  - link:/path/to/dsh-refine
+```bash
+cd ~/.dsh/profiles/web
+pnpm add link:/path/to/dsh-refine
+dsh plugin --profile web install
 ```
+
+The engine arrives as dsh-refine's own dependency (`dsh-continual-harness`
+`^0.3.1`) and mounts under an isolated `commands` scope, so its `/refine`
+adapter never collides with this package's.
 
 Restart `dsh web` to apply (host-side changes need a restart; client panel
 changes hot-reload while `pnpm run dev:web` is running).
